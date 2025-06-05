@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Canvas - Pantalla Completa</title>
+    
+    <!-- PIXI.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/5.3.3/pixi.min.js"></script>
+    
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <!-- Fonts -->
+    <link href="https://fonts.cdnfonts.com/css/ethnocentric" rel="stylesheet">
+    
+    <style>
+        /* Reset y estilos base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0F0F0F;
+        }
+
+        /* Estilos del contenedor principal */
+        .ai-canvas-wrapper {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0F0F0F;
+            overflow: hidden;
+        }
+
+        #ai-canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Controles */
+        .ai-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            text-align: center;
+        }
+
+        .ai-command-input {
+            width: 200px;
+            background: rgba(15, 15, 15, 0.8);
+            border: none;
+            outline: none;
+            border-bottom: 2px solid #F25C1F;
+            color: #F2F2F0;
+            font-size: 1.5rem;
+            text-align: center;
+            padding: 0.5rem;
+            opacity: 0.7;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .ai-command-input:hover,
+        .ai-command-input:focus {
+            opacity: 1;
+            border-bottom-color: #F2F2F0;
+        }
+
+        .ai-commands {
+            margin-top: 0.5rem;
+        }
+
+        .ai-command-hint {
+            font-size: 0.9rem;
+            color: rgba(242, 242, 240, 0.6);
+        }
+
+        /* Botón de subida */
+        .ai-upload {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            z-index: 999;
+            opacity: 0.7;
+            transition: opacity 0.3s;
+            cursor: pointer;
+        }
+
+        .ai-upload:hover {
+            opacity: 1;
+        }
+
+        .ai-upload input {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .ai-upload span {
+            color: #F2F2F0;
+            background: linear-gradient(45deg, #F25C1F, #C0392B);
+            display: block;
+            padding: 0.8rem 1.5rem;
+            border-radius: 50px;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .ai-upload:hover span {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(242, 92, 31, 0.4);
+        }
+
+        @media (max-width: 768px) {
+            .ai-command-input {
+                width: 80%;
+                max-width: 280px;
+                font-size: 0.9rem;
+                padding: 0.5rem;
+            }
+            
+            .ai-commands {
+                font-size: 0.75rem;
+            }
+
+            .ai-upload span {
+                padding: 0.6rem 1.2rem;
+                font-size: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ai-canvas-wrapper">
+        <div id="ai-canvas-container" data-will-read-frequently="true"></div>
+        
+        <div class="ai-controls">
+            <input type="text" id="ai-input" class="ai-command-input" placeholder="Escribe un comando..." value="#naive" />
+            <div class="ai-commands">
+                <span class="ai-command-hint">Comandos: #naive, #elder, #galaxy, #ring, #countdown</span>
+            </div>
+        </div>
+        
+        <div id="ai-upload-wrap" class="ai-upload">
+            <span>Subir Imagen</span>
+            <input type="file" id="ai-upload" accept="image/*">
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/ai-canvas.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.AICanvas && typeof AICanvas.init === 'function') {
+                // Inicializar AICanvas
+                AICanvas.init(); // Esto también llama a elder() con la imagen base64 por defecto
+                
+                // Esperar un momento para asegurar que AICanvas y sus listeners estén listos
+                setTimeout(() => {
+                    const imageUrl = 'src/logo_unicorn-bg.png';
+                    const uploadInput = document.getElementById('ai-upload');
+
+                    if (!uploadInput) {
+                        console.error('Elemento de subida #ai-upload no encontrado.');
+                        return;
+                    }
+
+                    fetch(imageUrl)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`Error al cargar la imagen: ${response.statusText}`);
+                            }
+                            return response.blob();
+                        })
+                        .then(blob => {
+                            const fileName = imageUrl.split('/').pop();
+                            const file = new File([blob], fileName, { type: blob.type || 'image/png' });
+                            
+                            // Para asignar archivos a un input type="file", se usa un objeto DataTransfer
+                            const dataTransfer = new DataTransfer();
+                            dataTransfer.items.add(file);
+                            uploadInput.files = dataTransfer.files;
+                            
+                            // Disparar el evento 'change' para que ai-canvas.js lo procese
+                            uploadInput.dispatchEvent(new Event('change', { bubbles: true }));
+                            console.log('Evento change disparado para la imagen del unicornio.');
+                        })
+                        .catch(error => {
+                            console.error('Error al precargar la imagen del unicornio:', error);
+                            // Como fallback, podríamos intentar ejecutar el comando #elder si la carga falla,
+                            // aunque AICanvas.init() ya lo hace por defecto.
+                            // const input = document.getElementById('ai-input');
+                            // if (input) {
+                            // input.value = "#elder";
+                            // input.dispatchEvent(new KeyboardEvent('keypress', { keyCode: 13 }));
+                            // }
+                        });
+                }, 1500); // Un poco más de tiempo para asegurar la inicialización completa
+            } else {
+                console.error('AICanvas no está inicializado correctamente.');
+            }
+        });
+    </script>
+</body>
+</html> 
